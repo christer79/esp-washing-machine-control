@@ -17,8 +17,11 @@
   - Open the "Tools -> Board -> Board Manager" and click install for the ESP8266"
   - Select your ESP8266 in "Tools -> Board"
 */
-
+#if defined(ESP8266)
 #include <ESP8266WiFi.h>
+#elif defined(ESP32)
+#include <WiFi.h>
+#endif
 #include <PubSubClient.h>
 #include "auth.h"
 
