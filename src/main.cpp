@@ -69,10 +69,9 @@ void setup_wifi()
 void senMQTTWashingMachineRunningDiscoveryMsg() {
   Serial.println("Sending discovery message");
   
-  DynamicJsonDocument doc(1024);
+  DynamicJsonDocument doc(2048);
 
-  char buffer[256];
-
+  char buffer[512];
   doc["name"] = mqttName;
   doc["stat_t"] = stateTopic;
   doc["cmd_t"] = commandTopic;
@@ -80,6 +79,7 @@ void senMQTTWashingMachineRunningDiscoveryMsg() {
   doc["pl_on"] = "ON";
   doc["pl_off"] = "OFF";
   doc["pl_avail"] = "online";
+  doc["icon"] = "mdi:washing-machine";
   size_t n = serializeJson(doc, buffer);
   Serial.println(String(buffer));
   Serial.println(n);
@@ -97,6 +97,9 @@ void callback(char *topic, byte *payload, unsigned int length)
   }
   Serial.println();
 
+  if (commandTopic.equals(String(topic))) {
+    client.publish(stateTopic.c_str(), payload, length);
+  }
   // Switch on the LED if an 1 was received as first character
   if ((char)payload[0] == '1')
   {
@@ -123,8 +126,8 @@ void reconnect()
     if (client.connect(clientId.c_str(), mqtt_user, mqtt_password))
     {
       Serial.println("connected");
-      client.setBufferSize(512);
-      client.subscribe("homeassistant/status");
+      client.setBufferSize(512); // Needed to allow for the config message to fit in a message
+      client.subscribe(commandTopic.c_str());
       senMQTTWashingMachineRunningDiscoveryMsg();
     }
     else
