@@ -24,6 +24,7 @@
 #endif
 #include <PubSubClient.h>
 #include "auth.h"
+#include <ArduinoJson.h>
 
 // Update these with values suitable for your network.
 
@@ -31,9 +32,13 @@
 WiFiClient espClient;
 PubSubClient client(espClient);
 unsigned long lastMsg = 0;
-#define MSG_BUFFER_SIZE (50)
-char msg[MSG_BUFFER_SIZE];
 int value = 0;
+
+const String mqttName = "Washing Machine";
+const String stateTopic = "homeassistant/switch/washing_machine";
+const String commandTopic = "homeassistant/switch/washing_machine/set";
+const String availabilityTopic = "homeassistant/switch/washing_machine/available";
+const String discoveryTopic = "homeassistant/switch/washing_machine/config";
 
 void setup_wifi()
 {
@@ -59,6 +64,26 @@ void setup_wifi()
   Serial.println("WiFi connected");
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
+}
+
+void senMQTTWashingMachineRunningDiscoveryMsg() {
+  Serial.println("Sending discovery message");
+  
+  DynamicJsonDocument doc(1024);
+
+  char buffer[256];
+
+  doc["name"] = mqttName;
+  doc["stat_t"] = stateTopic;
+  doc["cmd_t"] = commandTopic;
+  doc["avty_t"] = availabilityTopic;
+  doc["pl_on"] = "ON";
+  doc["pl_off"] = "OFF";
+  doc["pl_avail"] = "online";
+  size_t n = serializeJson(doc, buffer);
+  Serial.println(String(buffer));
+  Serial.println(n);
+  client.publish(discoveryTopic.c_str(), buffer, n);
 }
 
 void callback(char *topic, byte *payload, unsigned int length)
@@ -93,15 +118,14 @@ void reconnect()
     Serial.print("Attempting MQTT connection...");
     // Create a random client ID
     String clientId = "ESP8266Client-";
-    clientId += String(random(0xffff), HEX);
+    clientId += "aaaa";
     // Attempt to connect
     if (client.connect(clientId.c_str(), mqtt_user, mqtt_password))
     {
       Serial.println("connected");
-      // Once connected, publish an announcement...
-      client.publish("outTopic", "hello world");
-      // ... and resubscribe
-      client.subscribe("inTopic");
+      client.setBufferSize(512);
+      client.subscribe("homeassistant/status");
+      senMQTTWashingMachineRunningDiscoveryMsg();
     }
     else
     {
@@ -133,13 +157,10 @@ void loop()
   client.loop();
 
   unsigned long now = millis();
-  if (now - lastMsg > 2000)
+  if (now - lastMsg > 10000)
   {
     lastMsg = now;
-    ++value;
-    snprintf(msg, MSG_BUFFER_SIZE, "hello world #%ld", value);
-    Serial.print("Publish message: ");
-    Serial.println(msg);
-    client.publish("outTopic", msg);
+    Serial.println("Publish availability");
+    client.publish(availabilityTopic.c_str(), "online");
   }
 }
